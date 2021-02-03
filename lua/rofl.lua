@@ -22,16 +22,16 @@ end
 rofl.attach = function(bufnr)
   bufnr = bufnr or 0
 
-  vim.cmd [[autocmd! InsertCharPre <buffer> lua require'rofl'.notify("v_char", vim.api.nvim_get_vvar("char"))]]
+  -- vim.cmd [[autocmd! InsertCharPre <buffer> lua require'rofl'.notify("v_char", vim.api.nvim_get_vvar("char"))]]
+  vim.cmd [[autocmd! InsertCharPre <buffer> lua require'rofl'.insert_char_pre()]]
 
   vim.cmd [[autocmd! InsertLeave <buffer> lua require'rofl'.notify("insert_leave")]]
 
-  api.nvim_buf_attach(bufnr, true, {
-    on_lines = function()
-      -- local mode =  api.nvim_get_mode()["mode"]
-      rofl.notify("complete")
-    end,
-  })
+end
+
+rofl.insert_char_pre = function()
+  rofl.notify("v_char", vim.api.nvim_get_vvar("char"))
+  rofl.notify("complete")
 end
 
 rofl.request = function(method, ...)

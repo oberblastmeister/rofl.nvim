@@ -38,7 +38,8 @@ struct Completor {
     user_match: Arc<RwLock<String>>,
     sources: HashMap<String, SharedSource>,
     instant: Instant,
-    complete_fut: Option<AbortHandle>,
+    complete_abort: Option<AbortHandle>,
+    previous_complete: Option<Value>,
 }
 
 impl Completor {
@@ -48,7 +49,8 @@ impl Completor {
             user_match: Arc::new(RwLock::new(String::new())),
             sources: HashMap::new(),
             instant: Instant::now(),
-            complete_fut: None,
+            complete_abort: None,
+            previous_complete: Some(Value::Array(Vec::new())),
         }
     }
 
@@ -86,11 +88,7 @@ impl Completor {
         now.duration_since(earlier) < duration
     }
 
-    async fn complete(&self, nvim: SharedNvim) -> Result<()> {
-        // if self.quicker_than(Duration::from_millis(50)) {
-        //     return Ok(());
-        // }
-
+    async fn complete(&mut self, nvim: SharedNvim) -> Result<()> {
         // let mode = nvim.get_mode().await?.swap_remove(0).1;
         // let mode = mode.as_str().unwrap();
         // debug!("mode: {:?}", mode);
@@ -123,9 +121,7 @@ impl Completor {
 
         entries.sort_unstable_by(|e1, e2| e1.score.cmp(&e2.score));
 
-        let get = entries
-            .len()
-            .saturating_sub(PUM_HEIGHT);
+        let get = entries.len().saturating_sub(PUM_HEIGHT);
 
         drop(entries.drain(0..get));
 
@@ -178,17 +174,19 @@ impl Handler for NeovimHandler {
 
         match name.as_ref() {
             "complete" => {
-                if let Some(previous_complete) = self.completor.write().await.complete_fut.take() {
+                if let Some(previous_complete) = self.completor.write().await.complete_abort.take()
+                {
                     previous_complete.abort();
                 }
 
                 let fut = task::spawn(async move {
-                    let completor = completor.read().await;
+                    info!("completing");
+                    let mut completor = completor.write().await;
                     completor.complete(nvim).await.expect("Failed to complete");
                 });
 
                 let (_fut, handle) = abortable(fut);
-                self.completor.write().await.complete_fut.replace(handle);
+                self.completor.write().await.complete_abort.replace(handle);
             }
             "v_char" => {
                 task::spawn(async move {
@@ -230,12 +228,12 @@ async fn run() {
     // should be okay to be synchronous
     std::fs::create_dir_all(&cache_path).expect("Failed to create cache dir");
 
-    WriteLogger::init(
-        LevelFilter::Debug,
-        simplelog::Config::default(),
-        std::fs::File::create(cache_path.join("rofl.log")).expect("Failed to create log file"),
-    )
-    .expect("Failed to start logger");
+    // WriteLogger::init(
+    //     LevelFilter::Debug,
+    //     simplelog::Config::default(),
+    //     std::fs::File::create(cache_path.join("rofl.log")).expect("Failed to create log file"),
+    // )
+    // .expect("Failed to start logger");
 
     // we do not want to crash when panicking, instead log it
     panic::set_hook(Box::new(move |panic| {

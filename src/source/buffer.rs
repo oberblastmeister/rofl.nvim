@@ -27,7 +27,7 @@ impl Source for BufferWords {
 
     async fn update(&mut self, nvim: SharedNvim) -> Result<()> {
         let lines = nvim.get_current_buf().await?.get_lines(0, -1, true).await?;
-        let re = Regex::new(r"\w+").unwrap(); // TODO: use Tj's iskeyword 
+        let re = Regex::new(r"\w+").unwrap(); // TODO: use Tj's iskeyword
         let words: Vec<_> = lines
             .into_iter()
             .map(|line| {
