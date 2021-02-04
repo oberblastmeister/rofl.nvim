@@ -1,6 +1,7 @@
 mod buffer;
 mod counter;
 mod r#static;
+mod lua;
 
 use std::{fmt, sync::Arc};
 
@@ -18,6 +19,7 @@ use super::{Entry, Score, SharedNvim};
 pub use buffer::BufferWords;
 pub use counter::Counter;
 pub use r#static::Static;
+pub use lua::LuaFn;
 
 #[async_trait]
 pub trait Source: 'static + Sync + Send + DynClone + fmt::Debug {

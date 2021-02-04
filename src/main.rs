@@ -12,8 +12,11 @@ use async_trait::async_trait;
 use futures::future::AbortHandle;
 use futures::{future::abortable, future::join_all};
 use nvim_rs::{
-    call_args, compat::tokio::Compat, create::tokio as create, rpc::model::IntoVal, Handler,
-    Neovim, Value,
+    call_args,
+    compat::tokio::Compat,
+    create::tokio as create,
+    rpc::{model::IntoVal, unpack::TryUnpack},
+    Handler, Neovim, Value,
 };
 use simplelog::WriteLogger;
 use tokio::{
@@ -130,9 +133,14 @@ impl Completor {
         let opts: Vec<(Value, Value)> = Vec::new();
         nvim.call(
             "nvim_complete",
-            call_args!(nvim.call_function("col", call_args!(".")).await?, entries, opts),
+            call_args!(
+                nvim.call_function("col", call_args!(".")).await?,
+                entries,
+                opts
+            ),
         )
-        .await?.unwrap();
+        .await?
+        .unwrap();
         Ok(())
     }
 
@@ -208,6 +216,13 @@ impl Handler for NeovimHandler {
                     let completor = completor.read().await;
                     let mut source = completor.sources.get("buffer_words").unwrap().lock().await;
                     source.update(nvim).await.unwrap();
+                });
+            }
+            "add_lua_source" => {
+                task::spawn(async move {
+                    let mut completor = completor.write().await;
+                    let name: String = args.remove(0).try_unpack().unwrap();
+                    completor.register(&name.clone(), source::LuaFn::new(name));
                 });
             }
             _ => (),
