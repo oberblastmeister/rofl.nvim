@@ -1,9 +1,14 @@
 mod entry;
-mod nvim;
 mod score;
 mod source;
+mod utils;
 
-use std::{collections::HashMap, panic, sync::Arc, time::Duration};
+use std::{
+    collections::{HashMap, VecDeque},
+    panic,
+    sync::Arc,
+    time::Duration,
+};
 
 use log::{debug, error, info, trace, LevelFilter};
 
@@ -27,6 +32,8 @@ use tokio::{
     time::Instant,
 };
 
+use utils::*;
+
 pub use entry::Entry;
 pub use score::Score;
 pub use source::{SharedSource, Source};
@@ -43,6 +50,7 @@ struct Completor {
     instant: Instant,
     complete_abort: Option<AbortHandle>,
     previous_complete: Option<Value>,
+    byte_offset_history: VecDeque<i64>,
 }
 
 impl Completor {
@@ -54,6 +62,7 @@ impl Completor {
             instant: Instant::now(),
             complete_abort: None,
             previous_complete: Some(Value::Array(Vec::new())),
+            byte_offset_history: VecDeque::with_capacity(2),
         }
     }
 
@@ -74,14 +83,28 @@ impl Completor {
         self.v_char = Some(maybe_c);
     }
 
-    async fn update_user_match(&mut self) {
-        let mut user_match = self.user_match.write().await;
+    async fn update_user_match(&mut self, nvim: SharedNvim) -> Result<()> {
         if let Some(' ') = self.v_char {
-            user_match.clear();
+            self.user_match.write().await.clear();
         } else if let Some(c) = self.v_char {
-            user_match.push(c)
+            self.user_match.write().await.push(c);
         }
-        debug!("the user match is now: {}", user_match);
+
+        debug!("The byte difference is {:?}", self.byte_difference(nvim).await?);
+        // match self.byte_difference(nvim).await? {
+        //     Some(byte_diff) if byte_diff < 0 => {
+        //         let mut user_match = self.user_match.write().await;
+
+        //         let up_to = (user_match.len())
+        //             .checked_sub(byte_diff.checked_abs().unwrap_or(0) as usize)
+        //             .unwrap_or_else(|| user_match.len());
+        //         user_match.drain(..up_to);
+        //     }
+        //     _ => (),
+        // }
+
+        debug!("the user match is now: {}", self.user_match.read().await);
+        Ok(())
     }
 
     fn quicker_than(&mut self, duration: Duration) -> bool {
@@ -91,6 +114,26 @@ impl Completor {
         now.duration_since(earlier) < duration
     }
 
+    async fn byte_difference(&mut self, nvim: SharedNvim) -> Result<Option<i64>> {
+        let new_offset = get_byte_offset(nvim.clone()).await?;
+
+        if self.byte_offset_history.is_empty() {
+            self.byte_offset_history.push_back(new_offset);
+            Ok(None)
+        } else if self.byte_offset_history.len() == 1 {
+            let previous_offset = self.byte_offset_history[0];
+            self.byte_offset_history.push_back(new_offset);
+            Ok(Some(previous_offset - new_offset))
+        } else if self.byte_offset_history.len() == 2 {
+            self.byte_offset_history.pop_front();
+            let previous_offset = self.byte_offset_history[0];
+            self.byte_offset_history.push_back(new_offset);
+            Ok(Some(previous_offset - new_offset))
+        } else {
+            unreachable!()
+        }
+    }
+
     async fn complete(&mut self, nvim: SharedNvim) -> Result<()> {
         // let mode = nvim.get_mode().await?.swap_remove(0).1;
         // let mode = mode.as_str().unwrap();
@@ -98,6 +141,7 @@ impl Completor {
         // if mode != "i" || mode != "ic" {
         //     return Ok(());
         // }
+        self.update_user_match(nvim.clone()).await?;
 
         let mut futs = Vec::with_capacity(self.sources.len());
 
@@ -130,17 +174,8 @@ impl Completor {
 
         let entries = Entry::serialize(entries).await;
 
-        let opts: Vec<(Value, Value)> = Vec::new();
-        nvim.call(
-            "nvim_complete",
-            call_args!(
-                nvim.call_function("col", call_args!(".")).await?,
-                entries,
-                opts
-            ),
-        )
-        .await?
-        .unwrap();
+        nvim_complete(nvim.clone(), col(nvim, ".").await?, entries, Vec::new()).await?;
+
         Ok(())
     }
 
@@ -202,7 +237,6 @@ impl Handler for NeovimHandler {
                     let mut completor_handle = completor.write().await;
                     completor_handle.set_v_char(args.remove(0));
                     drop(args);
-                    completor_handle.update_user_match().await;
                 });
             }
             "insert_leave" => {

@@ -14,8 +14,8 @@ impl Entry {
         Entry { contents, score }
     }
 
-    pub async fn serialize(entries: Vec<Entry>) -> Value {
-        Value::Array(stream::iter(entries).map(|e| e.into()).collect().await)
+    pub async fn serialize(entries: Vec<Entry>) -> Vec<Value> {
+        stream::iter(entries).map(|e| e.into()).collect().await
     }
 
     pub fn score(self, text: &str) -> Option<Entry> {
