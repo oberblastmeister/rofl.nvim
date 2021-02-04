@@ -22,6 +22,10 @@ end
 rofl.attach = function(bufnr)
   bufnr = bufnr or 0
 
+  vim.api.nvim_register_filterfunc(function(_, _)
+    return 1
+  end)
+
   -- vim.cmd [[autocmd! InsertCharPre <buffer> lua require'rofl'.notify("v_char", vim.api.nvim_get_vvar("char"))]]
   vim.cmd [[autocmd! InsertCharPre <buffer> lua require'rofl'.insert_char_pre()]]
 
@@ -32,6 +36,7 @@ end
 rofl.insert_char_pre = function()
   rofl.notify("v_char", vim.api.nvim_get_vvar("char"))
   rofl.notify("complete")
+  vim.cmd[[redraw!]]
 end
 
 rofl.request = function(method, ...)

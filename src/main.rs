@@ -127,11 +127,12 @@ impl Completor {
 
         let entries = Entry::serialize(entries).await;
 
-        nvim.call_function(
-            "complete",
-            call_args!(nvim.call_function("col", call_args!(".")).await?, entries),
+        let opts: Vec<(Value, Value)> = Vec::new();
+        nvim.call(
+            "nvim_complete",
+            call_args!(nvim.call_function("col", call_args!(".")).await?, entries, opts),
         )
-        .await?;
+        .await?.unwrap();
         Ok(())
     }
 
@@ -228,12 +229,12 @@ async fn run() {
     // should be okay to be synchronous
     std::fs::create_dir_all(&cache_path).expect("Failed to create cache dir");
 
-    // WriteLogger::init(
-    //     LevelFilter::Debug,
-    //     simplelog::Config::default(),
-    //     std::fs::File::create(cache_path.join("rofl.log")).expect("Failed to create log file"),
-    // )
-    // .expect("Failed to start logger");
+    WriteLogger::init(
+        LevelFilter::Debug,
+        simplelog::Config::default(),
+        std::fs::File::create(cache_path.join("rofl.log")).expect("Failed to create log file"),
+    )
+    .expect("Failed to start logger");
 
     // we do not want to crash when panicking, instead log it
     panic::set_hook(Box::new(move |panic| {
