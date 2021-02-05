@@ -174,7 +174,12 @@ impl Completor {
 
         let entries = Entry::serialize(entries).await;
 
-        nvim_complete(nvim.clone(), col(nvim, ".").await?, entries, Vec::new()).await?;
+        let opts: Vec<(Value, Value)> = Vec::new();
+        nvim.call(
+            "nvim_complete",
+            call_args!(nvim.call_function("col", call_args!(".")).await?, entries, opts),
+        )
+        .await?.unwrap();
 
         Ok(())
     }
