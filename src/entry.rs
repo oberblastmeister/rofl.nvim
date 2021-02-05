@@ -41,6 +41,8 @@ impl From<Entry> for Value {
             "dup" => 1, // this match will be added even even if duplicate
             "equal" => 1, // do not filter, reduces flickering because we are filtering
             "abbr" => entry.contents,
+            "info" => "this is test info",
+            "menu" => "this is test menu",
         ])
     }
 }

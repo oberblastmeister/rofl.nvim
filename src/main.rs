@@ -40,7 +40,7 @@ pub use entry::Entry;
 pub use score::Score;
 pub use source::{SharedSource, Source};
 
-const PUM_HEIGHT: usize = 10;
+const PUM_HEIGHT: usize = 6;
 
 type Nvim = Neovim<Compat<Stdout>>;
 type SharedNvim = Arc<Nvim>;
@@ -343,8 +343,7 @@ async fn run() {
 }
 
 fn main() {
-    let mut runtime = runtime::Builder::new()
-        .threaded_scheduler()
+    let runtime = runtime::Builder::new_multi_thread()
         .build()
         .expect("Failed to build runtime");
     runtime.block_on(run())
