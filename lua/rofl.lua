@@ -19,18 +19,38 @@ rofl.start = function(bufnr)
   )
 end
 
+rofl.byte_offset = function()
+  return vim.fn.line2byte(vim.fn.line('.')) + vim.fn.col('.') - 2
+end
+
 rofl.attach = function(bufnr)
   bufnr = bufnr or 0
 
-  vim.api.nvim_register_filterfunc(function(prefix, _)
-    return 1
-  end)
+  vim.cmd [[augroup Rofl]]
+  vim.cmd [[au!]]
+  vim.cmd [[augroup END]]
+
+  vim.api.nvim_register_filterfunc(function() return 1 end)
 
   -- vim.cmd [[autocmd! InsertCharPre <buffer> lua require'rofl'.notify("v_char", vim.api.nvim_get_vvar("char"))]]
-  vim.cmd [[autocmd! InsertCharPre <buffer> lua require'rofl'.insert_char_pre()]]
+  vim.cmd [[autocmd Rofl InsertCharPre <buffer> lua require'rofl'.insert_char_pre()]]
 
-  vim.cmd [[autocmd! InsertLeave <buffer> lua require'rofl'.notify("insert_leave")]]
+  -- vim.cmd [[autocmd! TextChangedP <buffer> lua require'rofl'.notify("complete")]]
+  -- vim.cmd [[autocmd! TextChangedI <buffer> lua require'rofl'.notify("complete")]]
+  -- vim.cmd [[autocmd! TextChanged <buffer> lua require'rofl'.notify("complete")]]
 
+  vim.cmd [[autocmd Rofl InsertLeave <buffer> lua require'rofl'.notify("insert_leave")]]
+
+  vim.api.nvim_buf_attach(0, false, {
+    on_lines = function(_, buf, _, firstline, _, new_lastline)
+      local mode = api.nvim_get_mode()["mode"]
+      if mode ~= "i" or mode ~= "ic" then return end
+      local lines = api.nvim_buf_get_lines(buf, firstline, new_lastline, false)
+      if #lines == 0 then
+        rofl.notify("complete")
+      end
+    end
+  })
 end
 
 rofl.insert_char_pre = function()
