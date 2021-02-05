@@ -1,6 +1,7 @@
 use super::Score;
 use futures::stream::{self, StreamExt};
 use fuzzy_matcher::{skim::SkimMatcherV2, FuzzyMatcher};
+use nvim_meta::value;
 use nvim_rs::Value;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -34,6 +35,12 @@ impl Entry {
 
 impl From<Entry> for Value {
     fn from(entry: Entry) -> Value {
-        Value::String(entry.contents.into())
+        value!([
+            "word" => "",
+            "empty" => 1, // we just set word to be empty
+            "dup" => 1, // this match will be added even even if duplicate
+            "equal" => 1, // do not filter, reduces flickering because we are filtering
+            "abbr" => entry.contents,
+        ])
     }
 }

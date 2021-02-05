@@ -417,6 +417,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "nvim-meta"
+version = "0.1.0"
+dependencies = [
+ "nvim-rs",
+]
+
+[[package]]
 name = "nvim-rs"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -574,6 +581,7 @@ dependencies = [
  "futures-util",
  "fuzzy-matcher",
  "log",
+ "nvim-meta",
  "nvim-rs",
  "regex",
  "simplelog",

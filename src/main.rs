@@ -6,6 +6,7 @@ mod utils;
 use std::{
     collections::{HashMap, VecDeque},
     panic,
+    rc::Rc,
     sync::Arc,
     time::Duration,
 };
@@ -16,6 +17,7 @@ use anyhow::Result;
 use async_trait::async_trait;
 use futures::future::AbortHandle;
 use futures::{future::abortable, future::join_all};
+use nvim_meta::value;
 use nvim_rs::{
     call_args,
     compat::tokio::Compat,
@@ -38,9 +40,10 @@ pub use entry::Entry;
 pub use score::Score;
 pub use source::{SharedSource, Source};
 
-const PUM_HEIGHT: usize = 5;
+const PUM_HEIGHT: usize = 10;
 
-type SharedNvim = Arc<Neovim<Compat<Stdout>>>;
+type Nvim = Neovim<Compat<Stdout>>;
+type SharedNvim = Arc<Nvim>;
 
 #[derive(Debug, Clone)]
 struct Completor {
@@ -48,7 +51,6 @@ struct Completor {
     user_match: Arc<RwLock<String>>,
     sources: HashMap<String, SharedSource>,
     instant: Instant,
-    complete_abort: Option<AbortHandle>,
     previous_complete: Option<Value>,
     byte_offset_history: VecDeque<i64>,
 }
@@ -60,7 +62,6 @@ impl Completor {
             user_match: Arc::new(RwLock::new(String::new())),
             sources: HashMap::new(),
             instant: Instant::now(),
-            complete_abort: None,
             previous_complete: Some(Value::Array(Vec::new())),
             byte_offset_history: VecDeque::with_capacity(2),
         }
@@ -90,7 +91,10 @@ impl Completor {
             self.user_match.write().await.push(c);
         }
 
-        debug!("The byte difference is {:?}", self.byte_difference(nvim).await?);
+        // debug!(
+        //     "The byte difference is {:?}",
+        //     self.byte_difference(nvim).await?
+        // );
         // match self.byte_difference(nvim).await? {
         //     Some(byte_diff) if byte_diff < 0 => {
         //         let mut user_match = self.user_match.write().await;
@@ -114,25 +118,25 @@ impl Completor {
         now.duration_since(earlier) < duration
     }
 
-    async fn byte_difference(&mut self, nvim: SharedNvim) -> Result<Option<i64>> {
-        let new_offset = get_byte_offset(nvim.clone()).await?;
+    // async fn byte_difference(&mut self, nvim: SharedNvim) -> Result<Option<i64>> {
+    //     let new_offset = get_byte_offset(nvim.clone()).await?;
 
-        if self.byte_offset_history.is_empty() {
-            self.byte_offset_history.push_back(new_offset);
-            Ok(None)
-        } else if self.byte_offset_history.len() == 1 {
-            let previous_offset = self.byte_offset_history[0];
-            self.byte_offset_history.push_back(new_offset);
-            Ok(Some(previous_offset - new_offset))
-        } else if self.byte_offset_history.len() == 2 {
-            self.byte_offset_history.pop_front();
-            let previous_offset = self.byte_offset_history[0];
-            self.byte_offset_history.push_back(new_offset);
-            Ok(Some(previous_offset - new_offset))
-        } else {
-            unreachable!()
-        }
-    }
+    //     if self.byte_offset_history.is_empty() {
+    //         self.byte_offset_history.push_back(new_offset);
+    //         Ok(None)
+    //     } else if self.byte_offset_history.len() == 1 {
+    //         let previous_offset = self.byte_offset_history[0];
+    //         self.byte_offset_history.push_back(new_offset);
+    //         Ok(Some(previous_offset - new_offset))
+    //     } else if self.byte_offset_history.len() == 2 {
+    //         self.byte_offset_history.pop_front();
+    //         let previous_offset = self.byte_offset_history[0];
+    //         self.byte_offset_history.push_back(new_offset);
+    //         Ok(Some(previous_offset - new_offset))
+    //     } else {
+    //         unreachable!()
+    //     }
+    // }
 
     async fn complete(&mut self, nvim: SharedNvim) -> Result<()> {
         // let mode = nvim.get_mode().await?.swap_remove(0).1;
@@ -174,12 +178,16 @@ impl Completor {
 
         let entries = Entry::serialize(entries).await;
 
-        let opts: Vec<(Value, Value)> = Vec::new();
         nvim.call(
             "nvim_complete",
-            call_args!(nvim.call_function("col", call_args!(".")).await?, entries, opts),
+            call_args!(
+                nvim.call_function("col", call_args!(".")).await?,
+                entries,
+                value!([=>])
+            ),
         )
-        .await?.unwrap();
+        .await?
+        .unwrap();
 
         Ok(())
     }
@@ -193,6 +201,7 @@ impl Completor {
 #[derive(Debug, Clone)]
 struct NeovimHandler {
     completor: Arc<RwLock<Completor>>,
+    abort_handle: Arc<Mutex<Option<AbortHandle>>>,
 }
 
 #[async_trait]
@@ -223,8 +232,8 @@ impl Handler for NeovimHandler {
 
         match name.as_ref() {
             "complete" => {
-                if let Some(previous_complete) = self.completor.write().await.complete_abort.take()
-                {
+                let mut abort_handle = self.abort_handle.lock().await;
+                if let Some(ref mut previous_complete) = *abort_handle {
                     previous_complete.abort();
                 }
 
@@ -234,8 +243,8 @@ impl Handler for NeovimHandler {
                     completor.complete(nvim).await.expect("Failed to complete");
                 });
 
-                let (_fut, handle) = abortable(fut);
-                self.completor.write().await.complete_abort.replace(handle);
+                let (_, handle) = abortable(fut);
+                abort_handle.replace(handle);
             }
             "v_char" => {
                 task::spawn(async move {
@@ -309,6 +318,7 @@ async fn run() {
 
     let (nvim, io_handler) = create::new_parent(NeovimHandler {
         completor: Arc::new(RwLock::new(completor)),
+        abort_handle: Arc::new(Mutex::new(None)),
     })
     .await;
     info!("Connected to parent...");

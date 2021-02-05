@@ -30,8 +30,6 @@ rofl.attach = function(bufnr)
   vim.cmd [[au!]]
   vim.cmd [[augroup END]]
 
-  vim.api.nvim_register_filterfunc(function() return 1 end)
-
   -- vim.cmd [[autocmd! InsertCharPre <buffer> lua require'rofl'.notify("v_char", vim.api.nvim_get_vvar("char"))]]
   vim.cmd [[autocmd Rofl InsertCharPre <buffer> lua require'rofl'.insert_char_pre()]]
 
