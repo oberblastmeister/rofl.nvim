@@ -39,16 +39,16 @@ rofl.attach = function(bufnr)
 
   vim.cmd [[autocmd Rofl InsertLeave <buffer> lua require'rofl'.notify("insert_leave")]]
 
-  vim.api.nvim_buf_attach(0, false, {
-    on_lines = function(_, buf, _, firstline, _, new_lastline)
-      local mode = api.nvim_get_mode()["mode"]
-      if mode ~= "i" or mode ~= "ic" then return end
-      local lines = api.nvim_buf_get_lines(buf, firstline, new_lastline, false)
-      if #lines == 0 then
-        rofl.notify("complete")
-      end
-    end
-  })
+  -- vim.api.nvim_buf_attach(0, false, {
+  --   on_lines = function(_, buf, _, firstline, _, new_lastline)
+  --     local mode = api.nvim_get_mode()["mode"]
+  --     if mode ~= "i" or mode ~= "ic" then return end
+  --     local lines = api.nvim_buf_get_lines(buf, firstline, new_lastline, false)
+  --     if #lines == 0 then
+  --       rofl.notify("complete")
+  --     end
+  --   end
+  -- })
 end
 
 rofl.insert_char_pre = function()

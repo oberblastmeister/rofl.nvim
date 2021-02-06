@@ -139,6 +139,9 @@ impl Completor {
     // }
 
     async fn complete(&mut self, nvim: SharedNvim) -> Result<()> {
+        // if self.quicker_than(Duration::from_millis(100)) {
+        //     return Ok(());
+        // }
         // let mode = nvim.get_mode().await?.swap_remove(0).1;
         // let mode = mode.as_str().unwrap();
         // debug!("mode: {:?}", mode);
