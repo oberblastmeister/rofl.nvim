@@ -74,17 +74,38 @@ local sources = {
 
 }
 
-rofl.add_source = function(name, fn)
-  if sources[name] ~= nil then
-    error("There is already a source named " .. name)
+rofl.add_source = function(opts)
+  opts = opts or {}
+  if sources[opts.name] ~= nil then
+    error("There is already a source named " .. opts.name)
     return
   end
-  sources[name] = fn
+  sources[opts.name] = opts.fn
+  rofl.notify("add_lua_source", opts.name)
 end
 
 rofl.get_source = function(name)
   return sources[name]
 end
+
+rofl.call_source = function(name)
+  return rofl.get_source(name)()
+end
+
+-- rofl.add_source {
+--   name = "lua",
+--   fn = function()
+--     return {"hello", "person"}
+--   end
+-- }
+
+rofl.add_source {
+  name = "lines",
+  fn = function()
+    vim.wait(100)
+    -- return api.nvim_buf_get_lines(0, 0, -1, true)
+  end
+}
 
 -- use this to be able to run sources in tokio tasks
 return rofl

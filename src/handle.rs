@@ -100,6 +100,7 @@ pub async fn notify(
             task::spawn(async move {
                 let mut completor = completor.lock().await;
                 let name: String = args.remove(0).try_unpack().unwrap();
+                info!("Adding lua source with name: {}", name);
                 completor.register(&name.clone(), source::LuaFn::new(name));
                 Ok::<_, anyhow::Error>(())
             });

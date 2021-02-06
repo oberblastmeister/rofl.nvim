@@ -6,7 +6,6 @@ use anyhow::Result;
 use async_trait::async_trait;
 
 use log::info;
-use nvim_meta::value;
 use nvim_rs::{
     call_args,
     rpc::{model::IntoVal, unpack::TryUnpack},
@@ -14,7 +13,7 @@ use nvim_rs::{
 };
 
 #[derive(Debug, Clone)]
-pub struct LuaFn {
+pub struct LuaRequest {
     pub name: String,
 }
 
@@ -23,15 +22,11 @@ impl Source for LuaFn {
     async fn get(&mut self, nvim: SharedNvim, sender: EntrySender) -> Result<()> {
         info!("Calling lua source with name: {}", self.name);
         let entries: Vec<Value> = nvim
-            .call(
-                "nvim_exec_lua",
-                call_args!(
-                    format!(r#"return require'rofl'.call_source('{}')"#, self.name),
-                    value!([]),
-                ),
+            .call_function(
+                "luaeval",
+                call_args!(format!(r#"require'rofl'.call_source('{}')"#, self.name),),
             )
             .await?
-            .unwrap()
             .try_unpack()
             .expect("Failed to unpack");
 

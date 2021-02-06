@@ -6,13 +6,14 @@ mod source;
 mod utils;
 
 use std::{
+    error::Error,
     panic,
     sync::{atomic::AtomicBool, Arc},
 };
 
 use log::{error, info, trace, LevelFilter};
 
-use anyhow::Result;
+use anyhow::{anyhow, Context, Result};
 use async_trait::async_trait;
 
 use nvim_rs::{
@@ -105,29 +106,30 @@ async fn run() {
     );
     completor.register("buffer_words", source::BufferWords::new());
 
-    let (nvim, io_handler) = create::new_parent(NeovimHandler {
-        completor: Arc::new(Mutex::new(completor)),
+    let neovim_handler = NeovimHandler {
+        completor: Arc::new(Mutex::new(completor.clone())),
         abort_handle: Arc::new(Mutex::new(None)),
         complete_started: Arc::new(AtomicBool::new(false)),
-    })
-    .await;
-    info!("Connected to parent...");
+    };
 
-    // TODO: Any error should probably be logged, as stderr is not visible to users.
-    match io_handler.await {
-        Ok(res) => {
-            trace!("OK Result: {:?}", res);
-        }
-        Err(err) => {
-            nvim.err_writeln(&format!("Error: '{}'", err))
-                .await
-                .unwrap_or_else(|e| {
-                    // We could inspect this error to see what was happening, and
-                    // maybe retry, but at this point it's probably best
-                    // to assume the worst and print a friendly and
-                    // supportive message to our users
-                    eprintln!("Well, dang... '{}'", e);
-                });
+    loop {
+        let (nvim, io_handler) = create::new_parent(neovim_handler.clone()).await;
+
+        info!("Connected to parent...");
+        // TODO: Any error should probably be logged, as stderr is not visible to users.
+        match io_handler.await {
+            Err(joinerr) => error!("Error joining IO loop: {}", joinerr),
+            Ok(Err(err)) => {
+                let err = *err;
+                error!("{}", anyhow!("{:?}", err));
+                error!("There was an error: {}", err);
+                error!("Debug error: {:?}", err);
+                error!("Channel closed: {}", err.is_channel_closed());
+                error!("Is this a reader error: {}", err.is_reader_error());
+            }
+            Ok(Ok(())) => {
+                info!("got okay")
+            }
         }
     }
 }

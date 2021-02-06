@@ -109,11 +109,15 @@ impl Completor {
             let nvim = nvim.clone();
             let source = source.clone();
             let tx_clone = tx.clone();
+
             let fut = async move {
                 let mut source = source.lock().await;
-                source.get(nvim, tx_clone).await
+                source.get(nvim, tx_clone).await?;
+                Ok::<_, anyhow::Error>(())
             };
-            let handle = task::spawn(timeout(Duration::from_millis(100), fut));
+
+            let timeout_source = timeout(Duration::from_millis(200), fut);
+            let handle = task::spawn(timeout_source);
             futs.push(handle);
         }
         drop(tx); // very important
@@ -131,6 +135,14 @@ impl Completor {
             .await
             .into_iter()
             .map(|res| res.expect("Failed to join"))
+            .filter_map(|timeout_res| match timeout_res {
+                Err(e) => {
+                    info!("A source timed out: {:?}", e);
+                    None
+                }
+                Ok(res) => Some(res),
+            })
+            .map(|source_res| source_res.expect("Source errored"))
             .for_each(|_| ());
 
         let entries: Vec<_> = entries

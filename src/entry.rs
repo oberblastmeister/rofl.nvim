@@ -1,13 +1,17 @@
-use std::cmp;
+use std::{
+    cmp,
+    convert::{TryFrom, TryInto},
+};
 
-use std::hash::{Hash, Hasher};
 use super::Score;
+use anyhow::{anyhow, Context, Result};
 use futures::stream::{self, StreamExt};
 use fuzzy_matcher::{skim::SkimMatcherV2, FuzzyMatcher};
 use nvim_meta::value;
 use nvim_rs::Value;
+use std::hash::{Hash, Hasher};
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Entry {
     pub contents: String,
     pub score: Score,
@@ -58,5 +62,14 @@ impl Ord for Entry {
 impl PartialOrd for Entry {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
         Some(self.cmp(other))
+    }
+}
+
+impl TryFrom<Value> for Entry {
+    type Error = anyhow::Error;
+
+    fn try_from(value: Value) -> Result<Entry> {
+        let s = value.try_into().map_err(|_| anyhow!("Failed to tryfrom"))?;
+        Ok(Entry::new(s, Score::new(0)))
     }
 }

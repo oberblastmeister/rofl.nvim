@@ -22,7 +22,7 @@ type EntrySender = UnboundedSender<Entry>;
 
 #[async_trait]
 pub trait Source: 'static + Sync + Send + DynClone + fmt::Debug {
-    async fn get(&mut self, nvim: SharedNvim, sender: UnboundedSender<Entry>) -> anyhow::Result<()>;
+    async fn get(&mut self, nvim: SharedNvim, sender: EntrySender) -> anyhow::Result<()>;
 
     async fn update(&mut self, _nvim: SharedNvim) -> anyhow::Result<()> {
         Ok(())
