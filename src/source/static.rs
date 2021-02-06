@@ -1,5 +1,6 @@
-use super::{Score, SharedNvim, Source};
+use super::{EntrySender, Score, SharedNvim, Source};
 use crate::Entry;
+use anyhow::Result;
 use async_trait::async_trait;
 
 #[derive(Debug, Clone)]
@@ -18,7 +19,8 @@ impl Static {
 
 #[async_trait]
 impl Source for Static {
-    async fn get(&mut self, _nvim: SharedNvim, _: &str) -> Vec<Entry> {
-        self.0.clone()
+    async fn get(&mut self, _nvim: SharedNvim, sender: EntrySender) -> Result<()> {
+        sender.send(self.0[0].clone());
+        Ok(())
     }
 }

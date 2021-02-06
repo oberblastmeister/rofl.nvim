@@ -9,10 +9,7 @@ use async_trait::async_trait;
 use dyn_clone::DynClone;
 use futures::Stream;
 use nvim_rs::{compat::tokio::Compat, Neovim};
-use tokio::{
-    io::Stdout,
-    sync::{mpsc::Sender, Mutex, RwLock},
-};
+use tokio::{io::Stdout, sync::{Mutex, RwLock, mpsc::{Sender, UnboundedSender}}};
 
 use super::{Entry, Score, SharedNvim};
 
@@ -21,9 +18,12 @@ pub use counter::Counter;
 pub use r#static::Static;
 pub use lua::LuaFn;
 
+type EntrySender = UnboundedSender<Entry>;
+
 #[async_trait]
 pub trait Source: 'static + Sync + Send + DynClone + fmt::Debug {
-    async fn get(&mut self, nvim: SharedNvim, user_match: &str) -> Vec<Entry>;
+    async fn get(&mut self, nvim: SharedNvim, sender: UnboundedSender<Entry>) -> anyhow::Result<()>;
+
     async fn update(&mut self, _nvim: SharedNvim) -> anyhow::Result<()> {
         Ok(())
     }

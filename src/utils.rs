@@ -1,7 +1,11 @@
+use std::fmt;
+
 use super::SharedNvim;
 use anyhow::Result;
+use futures::Future;
+use nvim_meta::{api, function};
 use nvim_rs::{call_args, rpc::model::IntoVal, Value};
-use nvim_meta::{function, api};
+use tokio::task;
 
 // function! {
 //     pub async fn line(nvim: SharedNvim, mark: &str) -> Result<i64>;
@@ -21,3 +25,14 @@ use nvim_meta::{function, api};
 //     let res = line2byte(nvim.clone(), line).await? + col - 2;
 //     Ok(res)
 // }
+//
+
+pub async fn panic_task<T, U, E>(task: T)
+where
+    T: Future<Output = std::result::Result<U, E>> + Send + 'static,
+    T::Output: Send + 'static,
+    U: Send + 'static,
+    E: fmt::Debug + Send + 'static,
+{
+    task::spawn(async move { task.await.expect("Task panicked!") });
+}

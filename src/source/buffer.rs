@@ -1,4 +1,4 @@
-use super::Source;
+use super::{EntrySender, Source};
 use crate::{Entry, Score, SharedNvim};
 use anyhow::Result;
 use async_trait::async_trait;
@@ -17,12 +17,15 @@ impl BufferWords {
 
 #[async_trait]
 impl Source for BufferWords {
-    async fn get(&mut self, nvim: SharedNvim, _user_match: &str) -> Vec<Entry> {
+    async fn get(&mut self, nvim: SharedNvim, sender: EntrySender) -> Result<()> {
         self.words
             .clone()
             .into_iter()
             .map(|s| Entry::new(s, Score::new(0)))
-            .collect()
+            .for_each(|e| {
+                sender.send(e);
+            });
+        Ok(())
     }
 
     async fn update(&mut self, nvim: SharedNvim) -> Result<()> {

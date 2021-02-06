@@ -1,3 +1,6 @@
+use std::cmp;
+
+use std::hash::{Hash, Hasher};
 use super::Score;
 use futures::stream::{self, StreamExt};
 use fuzzy_matcher::{skim::SkimMatcherV2, FuzzyMatcher};
@@ -41,8 +44,19 @@ impl From<Entry> for Value {
             "dup" => 1, // this match will be added even even if duplicate
             "equal" => 1, // do not filter, reduces flickering because we are filtering
             "abbr" => entry.contents,
-            "info" => "this is test info",
-            "menu" => "this is test menu",
+            "menu" => "[B]",
         ])
+    }
+}
+
+impl Ord for Entry {
+    fn cmp(&self, other: &Self) -> cmp::Ordering {
+        self.score.cmp(&other.score)
+    }
+}
+
+impl PartialOrd for Entry {
+    fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
+        Some(self.cmp(other))
     }
 }

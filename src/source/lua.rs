@@ -1,5 +1,6 @@
-use super::Source;
+use super::{EntrySender, Source};
 use crate::{Entry, Score, SharedNvim};
+use anyhow::Result;
 use async_trait::async_trait;
 
 use nvim_rs::{
@@ -14,7 +15,7 @@ pub struct LuaFn {
 
 #[async_trait]
 impl Source for LuaFn {
-    async fn get(&mut self, nvim: SharedNvim, _user_match: &str) -> Vec<Entry> {
+    async fn get(&mut self, nvim: SharedNvim, sender: EntrySender) -> Result<()> {
         nvim.call_function(
             "luaeval",
             call_args!(
@@ -22,9 +23,8 @@ impl Source for LuaFn {
                 vec![self.name.clone()]
             ),
         )
-        .await
-        .unwrap();
-        vec![]
+        .await?;
+        Ok(())
     }
 }
 
